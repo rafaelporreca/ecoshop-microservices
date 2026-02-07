@@ -9,5 +9,5 @@ spring:
       server:
         git:
           uri: https://github.com/rafaelporreca/ecoshop-config-repo
-          default-label: master # ou main, dependendo do seu git init
+          default-label: main # ou main, dependendo do seu git init
           clone-on-start: true
