@@ -1,0 +1,23 @@
+# --- IntelliJ IDEA ---
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+
+# --- Maven ---
+target/
+!.mvn/wrapper/maven-wrapper.jar
+
+# --- OS Files (Lixo de Sistema Operacional) ---
+.DS_Store
+Thumbs.db
+
+# --- Logs e Arquivos Temporários ---
+*.log
+*.tmp
+*.bak
+
+# --- Segurança (Nunca comitar credenciais) ---
+.env
+secrets.yml
