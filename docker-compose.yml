@@ -43,5 +43,12 @@ services:
     ports:
       - "9411:9411"
 
+  # --- Cache & Rate Limiting ---
+  redis:
+    image: redis:alpine
+    container_name: ecoshop-redis
+    ports:
+      - "6379:6379"
+
 volumes:
   postgres_data:
