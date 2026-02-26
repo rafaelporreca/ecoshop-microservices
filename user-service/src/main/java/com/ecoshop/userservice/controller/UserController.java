@@ -1,5 +1,7 @@
 package com.ecoshop.userservice.controller;
 
+import com.ecoshop.userservice.dto.AuthResponse;
+import com.ecoshop.userservice.dto.LoginRequest;
 import com.ecoshop.userservice.dto.UserRequest;
 import com.ecoshop.userservice.dto.UserResponse;
 import com.ecoshop.userservice.service.UserService;
@@ -22,6 +24,12 @@ public class UserController {
 
         // Retorna 201 Created com o JSON no corpo
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<AuthResponse> login(@RequestBody LoginRequest request) {
+        AuthResponse response = userService.login(request);
+        return ResponseEntity.ok(response); // Retorna 200 OK com o token no body
     }
 
 }

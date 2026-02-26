@@ -1,11 +1,15 @@
 package com.ecoshop.userservice.service;
 
+import com.ecoshop.userservice.dto.AuthResponse;
+import com.ecoshop.userservice.dto.LoginRequest;
 import com.ecoshop.userservice.dto.UserRequest;
 import com.ecoshop.userservice.model.User;
 import com.ecoshop.userservice.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +24,8 @@ public class UserServiceImpl implements UserService{
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final AuthenticationManager authenticationManager;
+    private final JwtService jwtService;
 
     @Override
     @Transactional
@@ -41,5 +47,22 @@ public class UserServiceImpl implements UserService{
         User savedUser = userRepository.save(user); // O save retorna o objeto com ID preenchido
         log.info("User {} registered successfully", savedUser.getId());
         return savedUser.getId();
+    }
+
+    @Override
+    public AuthResponse login(LoginRequest loginRequest) {
+        // 1. Delega para o Spring Security validar o email e senha
+        // Se a senha estiver errada, ele lança uma exceção (BadCredentialsException) automaticamente
+        authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(
+                        loginRequest.email(),
+                        loginRequest.password()
+                )
+        );
+
+        // 2. Se passou da linha acima, as credenciais estão corretas. Geramos o token.
+        String token = jwtService.generateToken(loginRequest.email());
+
+        return new AuthResponse(token);
     }
 }
