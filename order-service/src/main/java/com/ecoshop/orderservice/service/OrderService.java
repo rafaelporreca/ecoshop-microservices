@@ -1,12 +1,15 @@
 package com.ecoshop.orderservice.service;
 
 import com.ecoshop.orderservice.dto.OrderRequest;
+import com.ecoshop.orderservice.event.InventoryFailedEvent;
+import com.ecoshop.orderservice.event.InventoryReservedEvent;
 import com.ecoshop.orderservice.event.OrderCreatedEvent;
 import com.ecoshop.orderservice.model.Order;
 import com.ecoshop.orderservice.model.OrderStatus;
 import com.ecoshop.orderservice.repository.OrderRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -50,6 +53,33 @@ public class OrderService {
         log.info("Evento OrderCreatedEvent enviado para o Kafka no tópico: {}", TOPIC);
 
         return savedOrder.getId();
+    }
+
+    @Transactional
+    public void handleInventoryReserved(InventoryReservedEvent event) {
+        log.info("Recebido sucesso do stock para o pedido: {}", event.orderId());
+
+        Order order = orderRepository.findById(event.orderId())
+                .orElseThrow(() -> new RuntimeException("Pedido não encontrado"));
+
+        order.setStatus(OrderStatus.APPROVED);
+        orderRepository.save(order);
+
+        log.info("Saga Concluída! Pedido {} aprovado.", order.getId());
+    }
+
+    @KafkaListener(topics = "inventory-failed-topic", groupId = "order-group")
+    @Transactional
+    public void handleInventoryFailed(InventoryFailedEvent event) {
+        log.info("Recebida falha do stock para o pedido: {} - Motivo: {}", event.orderId(), event.reason());
+
+        Order order = orderRepository.findById(event.orderId())
+                .orElseThrow(() -> new RuntimeException("Pedido não encontrado"));
+
+        order.setStatus(OrderStatus.REJECTED); // Rollback da Saga
+        orderRepository.save(order);
+
+        log.error("Saga Abortada! Pedido {} cancelado.", order.getId());
     }
 
 }
