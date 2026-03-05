@@ -1,9 +1,7 @@
 package com.ecoshop.orderservice.service;
 
 import com.ecoshop.orderservice.dto.OrderRequest;
-import com.ecoshop.orderservice.event.InventoryFailedEvent;
-import com.ecoshop.orderservice.event.InventoryReservedEvent;
-import com.ecoshop.orderservice.event.OrderCreatedEvent;
+import com.ecoshop.orderservice.event.*;
 import com.ecoshop.orderservice.model.Order;
 import com.ecoshop.orderservice.model.OrderStatus;
 import com.ecoshop.orderservice.repository.OrderRepository;
@@ -55,31 +53,51 @@ public class OrderService {
         return savedOrder.getId();
     }
 
-    @Transactional
+    // 1. O ESTOQUE DEU CERTO (Apenas loga, não aprova o pedido ainda)
+    @KafkaListener(topics = "inventory-success-topic", groupId = "order-group")
     public void handleInventoryReserved(InventoryReservedEvent event) {
-        log.info("Recebido sucesso do stock para o pedido: {}", event.orderId());
+        log.info("Estoque reservado para o pedido {}. Aguardando processamento do pagamento...", event.orderId());
+    }
 
+    // 2. O ESTOQUE FALHOU (Rejeita o pedido direto)
+    @KafkaListener(topics = "inventory-failed-topic", groupId = "order-group")
+    @Transactional
+    public void handleInventoryFailed(InventoryFailedEvent event) {
+        log.error("Estoque falhou para o pedido {}: {}. Cancelando pedido.", event.orderId(), event.reason());
+        Order order = orderRepository.findById(event.orderId())
+                .orElseThrow(() -> new RuntimeException("Pedido não encontrado"));
+        order.setStatus(OrderStatus.REJECTED);
+        orderRepository.save(order);
+    }
+
+    // 3. O PAGAMENTO DEU CERTO (Aprovação Final!)
+    @KafkaListener(topics = "payment-success-topic", groupId = "order-group")
+    @Transactional
+    public void handlePaymentProcessed(PaymentProcessedEvent event) {
+        log.info("Pagamento confirmado para o pedido: {}", event.orderId());
         Order order = orderRepository.findById(event.orderId())
                 .orElseThrow(() -> new RuntimeException("Pedido não encontrado"));
 
         order.setStatus(OrderStatus.APPROVED);
         orderRepository.save(order);
 
-        log.info("Saga Concluída! Pedido {} aprovado.", order.getId());
+        log.info("SAGA CONCLUÍDA! Pedido {} 100% aprovado.", order.getId());
     }
 
-    @KafkaListener(topics = "inventory-failed-topic", groupId = "order-group")
+    // 4. O PAGAMENTO FALHOU (Rejeita o pedido)
+    @KafkaListener(topics = "payment-failed-topic", groupId = "order-group")
     @Transactional
-    public void handleInventoryFailed(InventoryFailedEvent event) {
-        log.info("Recebida falha do stock para o pedido: {} - Motivo: {}", event.orderId(), event.reason());
-
+    public void handlePaymentFailed(PaymentFailedEvent event) {
+        log.error("Pagamento recusado para o pedido {}: {}", event.orderId(), event.reason());
         Order order = orderRepository.findById(event.orderId())
                 .orElseThrow(() -> new RuntimeException("Pedido não encontrado"));
 
-        order.setStatus(OrderStatus.REJECTED); // Rollback da Saga
+        order.setStatus(OrderStatus.REJECTED);
         orderRepository.save(order);
 
-        log.error("Saga Abortada! Pedido {} cancelado.", order.getId());
+        // NOTA DE ARQUITETURA: Em um sistema real de produção, aqui nós enviaríamos
+        // uma mensagem para um tópico como "inventory-rollback-topic" para o
+        // Inventory Service devolver os itens para a prateleira!
     }
 
 }
