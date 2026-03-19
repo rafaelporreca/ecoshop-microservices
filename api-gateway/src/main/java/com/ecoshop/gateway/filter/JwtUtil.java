@@ -12,7 +12,7 @@ import java.security.Key;
 public class JwtUtil {
 
     // Lê a mesma chave secreta que vamos partilhar no repositório de configurações
-    @Value("${application.security.jwt.secret-key}")
+    @Value("${application.security.jwt.secret-key:}")
     private String secretKey;
 
     public void validateToken(final String token) {
